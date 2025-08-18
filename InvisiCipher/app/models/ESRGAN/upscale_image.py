@@ -28,7 +28,7 @@ def upscale_image(image_filepath):
     with torch.no_grad():
         image_high_res = model(image_low_res).data.squeeze().float().cpu().clamp_(0, 1).numpy()
     image_high_res = np.transpose(image_high_res[[2, 1, 0], :, :], (1, 2, 0))
-    image_high_res = (image_high_res * 255.0).round()
+    image_high_res = (image_high_res * 255.0).round().astype(np.uint8)
 
     output_filepath = os.path.abspath('upscaled.png')
     cv2.imwrite(output_filepath, image_high_res)

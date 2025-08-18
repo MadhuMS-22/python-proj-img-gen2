@@ -636,7 +636,7 @@ class MainAppWindow(QMainWindow):
         with torch.no_grad():
             image_high_res = model(image_low_res).data.squeeze().float().cpu().clamp_(0, 1).numpy()
         image_high_res = np.transpose(image_high_res[[2, 1, 0], :, :], (1, 2, 0))
-        image_high_res = (image_high_res * 255.0).round()
+        image_high_res = (image_high_res * 255.0).round().astype(np.uint8)
 
         high_res_image_path = os.path.abspath(os.path.join(os.path.dirname(BASE_DIR), "upscaled.png"))
         cv2.imwrite(high_res_image_path, image_high_res)
