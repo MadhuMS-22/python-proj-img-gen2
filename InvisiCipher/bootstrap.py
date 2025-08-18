@@ -33,8 +33,23 @@ def venv_python():
 def install_requirements():
     py = venv_python()
     run([py, "-m", "pip", "install", "--upgrade", "pip", "setuptools", "wheel"])
+    
+    # Handle TensorFlow installation carefully
+    print("[+] Installing TensorFlow with specific version...")
+    try:
+        # Uninstall any existing tensorflow to avoid conflicts
+        subprocess.call([py, "-m", "pip", "uninstall", "tensorflow", "-y"])
+        # Install specific TensorFlow version
+        run([py, "-m", "pip", "install", "tensorflow==2.10.0"])
+    except subprocess.CalledProcessError:
+        print("[!] TensorFlow installation failed, trying alternative approach...")
+        # Fallback: install without version constraint
+        run([py, "-m", "pip", "install", "tensorflow"])
+    
+    # Install other requirements
     req = ROOT / "requirements.txt"
     if req.exists():
+        print("[+] Installing other requirements...")
         run([py, "-m", "pip", "install", "-r", str(req)])
     else:
         print("[!] requirements.txt not found; skipping.")

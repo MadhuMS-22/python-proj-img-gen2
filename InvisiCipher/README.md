@@ -89,6 +89,25 @@ CLI alternative: `python app/main_CLI_v1.py`
 - Text-to-image generation has been removed to keep the project lightweight and dependency-stable.
 - ESRGAN/Stego models are included; ensure your system has enough RAM/VRAM or it will fall back to CPU.
 
+## Troubleshooting
+
+If you encounter TensorFlow compatibility issues (like `TypeError: unhashable type: 'list'`), run:
+
+```bash
+python fix_tensorflow.py
+```
+
+This script will:
+- Check Python version compatibility (3.7-3.10 recommended)
+- Uninstall conflicting TensorFlow versions
+- Install TensorFlow 2.10.0 (stable version)
+- Provide manual troubleshooting steps if needed
+
+**Common issues:**
+- **Python version**: Use Python 3.7-3.10 for best TensorFlow compatibility
+- **Virtual environment**: Always use a fresh virtual environment
+- **GPU issues**: The app will automatically fall back to CPU if GPU is unavailable
+
 ## Publish to your GitHub
 
 Reinitialize and push to your own repo (replace `<your-username>` and `<your-repo>`):

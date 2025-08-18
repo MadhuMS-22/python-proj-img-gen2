@@ -1021,10 +1021,10 @@ class MainAppWindow(QMainWindow):
                 aes.encrypt(filepath, self.key_text_box.text())
             else:
                 blowfish.encrypt(filepath, self.key_text_box.text())
-            self.last_download_path = filepath + '.enc'
+                self.last_download_path = filepath + '.enc'
             self.download_enc_button.setEnabled(True)
             if self.enc_img_text_label is not None:
-                self.enc_img_text_label.setText("Encrypted!")
+            self.enc_img_text_label.setText("Encrypted!")
                 self.enc_img_text_label.setStyleSheet("font-size: 16px; color: #00ff00; margin-bottom: 10px; font-weight: bold;")
             self.key_text_box.setText("")
         except Exception as e:
@@ -1049,10 +1049,10 @@ class MainAppWindow(QMainWindow):
                 result, dec_filename = blowfish.decrypt(filepath, self.key_text_box_of_dec.text())
             if result == -1 or not dec_filename:
                 QMessageBox.critical(self, "Decrypting Error", "Wrong key or failed to decrypt.")
-                return
+                    return
             self.download_dec_button.setEnabled(True)
             if self.dec_img_text_label is not None:
-                self.dec_img_text_label.setText("Decrypted!")
+            self.dec_img_text_label.setText("Decrypted!")
                 self.dec_img_text_label.setStyleSheet("font-size: 16px; color: #00ff00; margin-bottom: 10px; font-weight: bold;")
             # Show decrypted output in the box
             self.set_label_image_box(self.dec_display_label, dec_filename, 256, 256)
