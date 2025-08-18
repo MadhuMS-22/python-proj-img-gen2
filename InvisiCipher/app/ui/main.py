@@ -8,9 +8,9 @@ import numpy as np
 import torch
 from PyQt5.QtCore import QFile, QTextStream
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QIcon, QPixmap, QFont
+from PyQt5.QtGui import QIcon, QPixmap, QFont, QPainter, QColor
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, \
-    QMessageBox, QFileDialog, QDialog, QRadioButton, QButtonGroup
+    QMessageBox, QFileDialog, QDialog, QRadioButton, QButtonGroup, QLineEdit, QScrollArea, QSizePolicy
 
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
@@ -24,6 +24,8 @@ from app.ui.components.customtextbox import CustomTextBox
 
 # Get the base directory for assets
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# Project root (InvisiCipher/) two levels up from ui/
+PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, "..", ".."))
 
 class MainAppWindow(QMainWindow):
     def __init__(self):
@@ -61,11 +63,10 @@ class MainAppWindow(QMainWindow):
         self.download_HR_button = None
 
         # Set window properties
-        self.setWindowTitle("InvisiCipher")
+        self.setWindowTitle("ImageSteganography")
         self.setGeometry(200, 200, 1400, 800)
-        self.setWindowIcon(QIcon(os.path.join(BASE_DIR, "icon.ico")))
+        self.setWindowIcon(QIcon(os.path.join(PROJECT_ROOT, "logo.png")))
         self.setStyleSheet("background-color: #2b2b2b;")
-        self.setFixedSize(self.size())
         # self.setWindowFlags(Qt.FramelessWindowHint)
 
         # Set up the main window layout
@@ -73,21 +74,25 @@ class MainAppWindow(QMainWindow):
 
         # Create the side navigation bar
         side_navigation = BackgroundWidget()
-        side_navigation.set_background_image(os.path.join(BASE_DIR, "assets/components_backgrounds/sidebar_bg.jpg"))
+        # Set sidebar background image from project root (vertical menu background)
+        menubg_path = os.path.join(PROJECT_ROOT, "menubg.jpg")
+        if os.path.exists(menubg_path):
+            side_navigation.set_background_image(menubg_path)
         side_navigation.setObjectName("side_navigation")
         side_navigation.setFixedWidth(200)
         side_layout = QVBoxLayout()
 
         # label for logo
         logo_label = QLabel()
-        logo_pixmap = QPixmap(os.path.join(BASE_DIR, "logo.png")).scaled(50, 50, Qt.KeepAspectRatio)
+        logo_pixmap = QPixmap(os.path.join(PROJECT_ROOT, "logo.png")).scaled(50, 50, Qt.KeepAspectRatio)
         logo_label.setPixmap(logo_pixmap)
         logo_label.setAlignment(Qt.AlignCenter)
 
-        # label for logo name
+        # label for app name (avoid overflow in narrow sidebar)
         name_label = QLabel()
-        name_label.setText("<h2>InvisiCipher</h2><br><br><br><br><br><br><br><br><br>")
-        name_label.setStyleSheet("color: #ffffff;")
+        name_label.setText("ImageSteganography")
+        name_label.setWordWrap(True)
+        name_label.setStyleSheet("color: #ffffff; font-size: 14px; font-weight: 800;")
         name_label.setAlignment(Qt.AlignCenter)
 
         # Create buttons for each option
@@ -107,11 +112,19 @@ class MainAppWindow(QMainWindow):
         # Add buttons to the side navigation layout
         side_layout.addWidget(logo_label)
         side_layout.addWidget(name_label)
+        side_layout.addSpacing(8)
         side_layout.addWidget(image_hiding_button)
         side_layout.addWidget(encryption_button)
         side_layout.addWidget(decryption_button)
         side_layout.addWidget(image_reveal_button)
         side_layout.addWidget(super_resolution_button)
+        # Auth buttons below navigation
+        login_button = QPushButton("Log in")
+        signup_button = QPushButton("Sign up")
+        login_button.clicked.connect(self.show_login_dialog)
+        signup_button.clicked.connect(self.show_signup_dialog)
+        side_layout.addWidget(login_button)
+        side_layout.addWidget(signup_button)
 
         # Add a logout button
         logout_button = QPushButton("Exit")
@@ -126,21 +139,34 @@ class MainAppWindow(QMainWindow):
         # Create the main content area
         self.main_content = BackgroundWidget()
         self.main_content.setObjectName("main_content")
-        self.main_content.set_background_image(os.path.join(BASE_DIR, "assets/components_backgrounds/main_window_welcome_bg.png"))
+        # Set background image from project root bg.jpg
+        bg_path = os.path.join(PROJECT_ROOT, "bg.jpg")
+        if os.path.exists(bg_path):
+            self.main_content.set_background_image(bg_path)
         self.main_layout = QVBoxLayout()
         self.main_content.setLayout(self.main_layout)
 
-        # Add the side navigation and main content to the main window layout
+        # Add the side navigation and main content to the main window layout (scrollable)
         main_layout.addWidget(side_navigation)
-        main_layout.addWidget(self.main_content)
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QScrollArea.NoFrame)
+        scroll_area.setWidget(self.main_content)
+        main_layout.addWidget(scroll_area)
 
         # Set the main window layout
         central_widget = QWidget()
         central_widget.setLayout(main_layout)
         self.setCentralWidget(central_widget)
 
+        # Populate home page content
+        self.show_home_page()
+
     def show_encryption_page(self):
-        self.main_content.set_background_image(os.path.join(BASE_DIR, "assets/components_backgrounds/main_window_bg.png"))
+        # ensure bg applied
+        bg_path = os.path.join(PROJECT_ROOT, "bg.jpg")
+        if os.path.exists(bg_path):
+            self.main_content.set_background_image(bg_path)
         self.image_tobe_enc_filepath = None
         self.key_text_box = None
         self.enc_img_text_label = None
@@ -181,9 +207,9 @@ class MainAppWindow(QMainWindow):
         self.blowfish_radio = QRadioButton("Blowfish Encryption")
         self.blowfish_radio.setToolTip("Fast, efficient symmetric-key block cipher with versatile key lengths")
 
-        encryption_group = QButtonGroup()
-        encryption_group.addButton(self.aes_radio)
-        encryption_group.addButton(self.blowfish_radio)
+        self.encryption_group = QButtonGroup(self)
+        self.encryption_group.addButton(self.aes_radio)
+        self.encryption_group.addButton(self.blowfish_radio)
         radio_layout.addWidget(self.blowfish_radio)
         radio_layout.addWidget(self.aes_radio)
 
@@ -200,9 +226,7 @@ class MainAppWindow(QMainWindow):
         image_display_layout.addWidget(radio_layout_widget)
 
         self.enc_display_label = QLabel()
-        # self.enc_display_label.setAlignment(Qt.AlignCenter)
-        pixmap = QPixmap(os.path.join(BASE_DIR, "assets/dummy_images/image_dummy.png"))
-        self.enc_display_label.setPixmap(pixmap.scaled(256, 256, Qt.KeepAspectRatio))
+        self.set_label_placeholder(self.enc_display_label, 256, 256, "Select the image")
         image_display_layout.addWidget(self.enc_display_label)
 
         image_display_layout_widget = QWidget()
@@ -233,7 +257,9 @@ class MainAppWindow(QMainWindow):
         self.main_layout.addWidget(button_layout_widget)
 
     def show_decryption_page(self):
-        self.main_content.set_background_image(os.path.join(BASE_DIR, "assets/components_backgrounds/main_window_bg.png"))
+        bg_path = os.path.join(PROJECT_ROOT, "bg.jpg")
+        if os.path.exists(bg_path):
+            self.main_content.set_background_image(bg_path)
         self.key_text_box_of_dec = None
         # Clear the main window layout
         self.clear_main_layout()
@@ -272,9 +298,9 @@ class MainAppWindow(QMainWindow):
         self.blowfish_radio_dec = QRadioButton("Blowfish Decryption")
         self.blowfish_radio_dec.setToolTip("Fast, efficient symmetric-key block cipher with versatile key lengths")
 
-        encryption_group = QButtonGroup()
-        encryption_group.addButton(self.aes_radio_dec)
-        encryption_group.addButton(self.blowfish_radio_dec)
+        self.decryption_group = QButtonGroup(self)
+        self.decryption_group.addButton(self.aes_radio_dec)
+        self.decryption_group.addButton(self.blowfish_radio_dec)
         radio_layout.addWidget(self.blowfish_radio_dec)
         radio_layout.addWidget(self.aes_radio_dec)
 
@@ -292,8 +318,7 @@ class MainAppWindow(QMainWindow):
 
         self.dec_display_label = QLabel()
         self.dec_display_label.setAlignment(Qt.AlignLeft)
-        pixmap = QPixmap(os.path.join(BASE_DIR, "assets/dummy_images/image_dummy.png"))
-        self.dec_display_label.setPixmap(pixmap.scaled(256, 256, Qt.KeepAspectRatio))
+        self.set_label_placeholder(self.dec_display_label, 256, 256, "Select the image")
         image_display_layout.addWidget(self.dec_display_label)
 
         image_display_layout_widget = QWidget()
@@ -324,7 +349,9 @@ class MainAppWindow(QMainWindow):
         self.main_layout.addWidget(button_layout_widget)
 
     def show_image_hiding_page(self):
-        self.main_content.set_background_image(os.path.join(BASE_DIR, "assets/components_backgrounds/main_window_bg.png"))
+        bg_path = os.path.join(PROJECT_ROOT, "bg.jpg")
+        if os.path.exists(bg_path):
+            self.main_content.set_background_image(bg_path)
         self.secret_image_filepath = None
         self.cover_image_filepath = None
         # Clear the main window layout
@@ -343,7 +370,7 @@ class MainAppWindow(QMainWindow):
         self.main_layout.addWidget(model_path_label)
 
         # GPU Info
-        gpu_info_label = QLabel("<b><ul><li>Device: GPU:0 with 1654 MB memory</li><li>NVIDIA GeForce RTX 3050 Laptop GPU</li><li>Compute capability: 8.6</li><li>Loaded cuDNN version 8302</li></ul></b>")
+        gpu_info_label = QLabel("<b><ul><li>Device info will appear if available</li></ul></b>")
         gpu_info_label.setStyleSheet("font-size: 13px; color: #fae69e;")
         gpu_info_label.setAlignment(Qt.AlignTop)
         self.main_layout.addWidget(gpu_info_label)
@@ -375,20 +402,17 @@ class MainAppWindow(QMainWindow):
         image_display_layout = QHBoxLayout()
         self.cover_display_label = QLabel()
         self.cover_display_label.setAlignment(Qt.AlignCenter)
-        pixmap = QPixmap(os.path.join(BASE_DIR, "assets/dummy_images/cover_image_dummy.png"))
-        self.cover_display_label.setPixmap(pixmap.scaled(256, 256, Qt.KeepAspectRatio))
+        self.set_label_placeholder(self.cover_display_label, 256, 256, "Select the image")
         image_display_layout.addWidget(self.cover_display_label)
 
         self.secret_display_label = QLabel()
         self.secret_display_label.setAlignment(Qt.AlignCenter)
-        pixmap = QPixmap(os.path.join(BASE_DIR, "assets/dummy_images/secret_image_dummy.png"))
-        self.secret_display_label.setPixmap(pixmap.scaled(256, 256, Qt.KeepAspectRatio))
+        self.set_label_placeholder(self.secret_display_label, 256, 256, "Select the image")
         image_display_layout.addWidget(self.secret_display_label)
 
         self.steg_display_label = QLabel()
         self.steg_display_label.setAlignment(Qt.AlignCenter)
-        pixmap = QPixmap(os.path.join(BASE_DIR, "assets/dummy_images/steg_image_dummy.png"))
-        self.steg_display_label.setPixmap(pixmap.scaled(256, 256, Qt.KeepAspectRatio))
+        self.set_label_placeholder(self.steg_display_label, 256, 256, "Select the image")
         image_display_layout.addWidget(self.steg_display_label)
 
         image_display_layout_widget = QWidget()
@@ -423,7 +447,9 @@ class MainAppWindow(QMainWindow):
         self.main_layout.addWidget(button_layout_widget)
 
     def show_reveal_page(self):
-        self.main_content.set_background_image(os.path.join(BASE_DIR, "assets/components_backgrounds/main_window_bg.png"))
+        bg_path = os.path.join(PROJECT_ROOT, "bg.jpg")
+        if os.path.exists(bg_path):
+            self.main_content.set_background_image(bg_path)
         self.clear_main_layout()
 
         # Add content to the super resolution page
@@ -439,7 +465,7 @@ class MainAppWindow(QMainWindow):
         self.main_layout.addWidget(model_path_label)
 
         # GPU Info
-        gpu_info_label = QLabel("<b><ul><li>Device: GPU:0 with 1654 MB memory</li><li>NVIDIA GeForce RTX 3050 Laptop GPU</li><li>Compute capability: 8.6</li><li>Loaded cuDNN version 8302</li></ul></b>")
+        gpu_info_label = QLabel("<b><ul><li>Device info will appear if available</li></ul></b>")
         gpu_info_label.setStyleSheet("font-size: 13px; color: #fae69e;")
         gpu_info_label.setAlignment(Qt.AlignTop)
         self.main_layout.addWidget(gpu_info_label)
@@ -466,14 +492,12 @@ class MainAppWindow(QMainWindow):
         image_layout = QHBoxLayout()
         self.container_display_label = QLabel()
         self.container_display_label.setAlignment(Qt.AlignCenter)
-        pixmap = QPixmap(os.path.join(BASE_DIR, "assets/dummy_images/steg_image_dummy.png"))
-        self.container_display_label.setPixmap(pixmap.scaled(256, 256, Qt.KeepAspectRatio))
+        self.set_label_placeholder(self.container_display_label, 256, 256, "Select the image")
         image_layout.addWidget(self.container_display_label)
         
         self.secret_out_display_label = QLabel()
         self.secret_out_display_label.setAlignment(Qt.AlignCenter)
-        pixmap = QPixmap(os.path.join(BASE_DIR, "assets/dummy_images/secret_image_dummy.png"))
-        self.secret_out_display_label.setPixmap(pixmap.scaled(256, 256, Qt.KeepAspectRatio))
+        self.set_label_placeholder(self.secret_out_display_label, 256, 256, "Select the image")
         image_layout.addWidget(self.secret_out_display_label)
 
         image_layout_widget = QWidget()
@@ -504,7 +528,9 @@ class MainAppWindow(QMainWindow):
         self.main_layout.addWidget(button_layout_widget)
 
     def show_super_resolution_page(self):
-        self.main_content.set_background_image(os.path.join(BASE_DIR, "assets/components_backgrounds/main_window_bg.png"))
+        bg_path = os.path.join(PROJECT_ROOT, "bg.jpg")
+        if os.path.exists(bg_path):
+            self.main_content.set_background_image(bg_path)
         self.low_res_image_filepath = None
         # Clear the main window layout
         self.clear_main_layout()
@@ -523,7 +549,7 @@ class MainAppWindow(QMainWindow):
 
         # GPU Info
         gpu_info_label = QLabel(
-            "<b><ul><li>Device: GPU:0 with 1654 MB memory</li><li>NVIDIA GeForce RTX 3050 Laptop GPU</li><li>Compute capability: 8.6</li><li>Loaded cuDNN version 8302</li></ul></b>")
+            "<b><ul><li>Device info will appear if available</li></ul></b>")
         gpu_info_label.setStyleSheet("font-size: 13px; color: #fae69e;")
         gpu_info_label.setAlignment(Qt.AlignTop)
         self.main_layout.addWidget(gpu_info_label)
@@ -537,8 +563,7 @@ class MainAppWindow(QMainWindow):
         # image display
         image_label = QLabel()
         image_label.setAlignment(Qt.AlignCenter)
-        pixmap = QPixmap(os.path.join(BASE_DIR, "assets/dummy_images/lr_image_dummy.png"))
-        image_label.setPixmap(pixmap.scaled(384, 384, Qt.KeepAspectRatio))
+        self.set_label_placeholder(image_label, 384, 384, "Select the image")
         self.main_layout.addWidget(image_label)
 
         # defining button layout
@@ -580,8 +605,8 @@ class MainAppWindow(QMainWindow):
         low_res_image_filepath, _ = file_dialog.getOpenFileName(self, "Select Low Resolution Image")
         if low_res_image_filepath:
             self.low_res_image_filepath = low_res_image_filepath
-            pixmap = QPixmap(low_res_image_filepath)
-            label.setPixmap(pixmap.scaled(400, 400, Qt.KeepAspectRatio))
+            self.set_label_image_box(label, low_res_image_filepath, 384, 384)
+            self.style_image_box(label)
 
     def upscaleImage(self, label):
         if self.low_res_image_filepath is None:
@@ -619,8 +644,7 @@ class MainAppWindow(QMainWindow):
         # Display the high resolution image
         if os.path.exists(high_res_image_path):
             print("image saved as: ", high_res_image_path)
-            pixmap = QPixmap(high_res_image_path).scaled(400, 400, Qt.KeepAspectRatio)
-            label.setPixmap(pixmap)
+            self.set_label_image_box(label, high_res_image_path, 384, 384)
             self.low_res_image_text_label.setText("High Res Image:")
             self.low_res_image_text_label.setStyleSheet(
                 "font-size: 16px; color: #00ff00; margin-bottom: 10px; font-weight: bold;")
@@ -654,134 +678,93 @@ class MainAppWindow(QMainWindow):
         filepath, _ = file_dialog.getOpenFileName(self, "Select cover Image")
         if filepath:
             self.cover_image_filepath = filepath
-            pixmap = QPixmap(filepath)
-            label.setPixmap(pixmap.scaled(256, 256, Qt.KeepAspectRatio))
+            self.set_label_image_box(label, filepath, 256, 256)
+            self.style_image_box(label)
 
     def select_secret_image(self, label):
         file_dialog = QFileDialog()
         filepath, _ = file_dialog.getOpenFileName(self, "Select secret Image")
         if filepath:
             self.secret_image_filepath = filepath
-            pixmap = QPixmap(filepath)
-            label.setPixmap(pixmap.scaled(256, 256, Qt.KeepAspectRatio))
+            self.set_label_image_box(label, filepath, 256, 256)
+            self.style_image_box(label)
 
     def select_container_image(self, label):
         file_dialog = QFileDialog()
         filepath, _ = file_dialog.getOpenFileName(self, "Select secret Image")
         if filepath:
             self.container_image_filepath = filepath
-            pixmap = QPixmap(filepath)
-            label.setPixmap(pixmap.scaled(256, 256, Qt.KeepAspectRatio))
+            self.set_label_image_box(label, filepath, 256, 256)
+            self.style_image_box(label)
 
     def select_enc_image(self, label):
         file_dialog = QFileDialog()
         filepath, _ = file_dialog.getOpenFileName(self, "Select Image")
         if filepath:
             self.image_tobe_enc_filepath = filepath
-            pixmap = QPixmap(filepath)
-            label.setPixmap(pixmap.scaled(256, 256, Qt.KeepAspectRatio))
+            self.set_label_image_box(label, filepath, 256, 256)
+            self.style_image_box(label)
 
     def select_dec_image(self, label):
         file_dialog = QFileDialog()
         filepath, _ = file_dialog.getOpenFileName(self, "Select enc file")
         if filepath:
             self.enc_filepath = filepath
-            pixmap = QPixmap(os.path.join(BASE_DIR, "assets/dummy_images/locked_image_dummy.png"))
-            label.setPixmap(pixmap.scaled(256, 256, Qt.KeepAspectRatio))
+            self.set_label_placeholder(label, 256, 256, "Select the image")
 
-    def perform_hide(self, cover_filepath, secret_filepath):
-        if cover_filepath is None or secret_filepath is None:
-            QMessageBox.information(self, "Hiding Error", "Please select the images first.")
-            return
-        try:
-            steg_image_path = hide_image(cover_filepath, secret_filepath)
-            pixmap = QPixmap(steg_image_path)
-            self.steg_display_label.setPixmap(pixmap.scaled(256, 256, Qt.KeepAspectRatio))
-            self.download_steg_button.setEnabled(True)
-            self.last_download_path = steg_image_path
-            if hasattr(self, 'steg_text_label') and self.steg_text_label is not None:
-                self.steg_text_label.setText("Image Hidden Successfully!")
-                self.steg_text_label.setStyleSheet(
-                    "font-size: 16px; color: #00ff00; margin-bottom: 10px; font-weight: bold;")
-        except Exception as e:
-            QMessageBox.critical(self, "Hiding Error", f"Failed to hide the image.\n{e}")
+    def _placeholder_pixmap(self, width, height, text="Select the image"):
+        bg_path = os.path.join(PROJECT_ROOT, "imgbg.jpg")
+        if os.path.exists(bg_path):
+            bg = QPixmap(bg_path)
+            scaled = bg.scaled(width, height, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
+            x = (scaled.width() - width) // 2
+            y = (scaled.height() - height) // 2
+            canvas = scaled.copy(x, y, width, height)
+        else:
+            canvas = QPixmap(width, height)
+            canvas.fill(QColor(50, 50, 50))
+        painter = QPainter(canvas)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setPen(QColor(255, 255, 255))
+        f = QFont()
+        f.setPointSize(12)
+        f.setBold(True)
+        painter.setFont(f)
+        painter.drawText(canvas.rect(), Qt.AlignCenter, text)
+        painter.end()
+        return canvas
 
-    def perform_reveal(self, filepath):
-        if filepath is None:
-            QMessageBox.information(self, "Revealing Error", "Please select the image first.")
-            return
-        try:
-            secret_out_filepath = reveal_image(filepath)
-            pixmap = QPixmap(secret_out_filepath)
-            self.secret_out_display_label.setPixmap(pixmap.scaled(256, 256, Qt.KeepAspectRatio))
-            self.download_revealed_secret_image_button.setEnabled(True)
-            self.last_download_path = secret_out_filepath
-            if hasattr(self, 'secret_out_text_label') and self.secret_out_text_label is not None:
-                self.secret_out_text_label.setText("Image Revealed Successfully!")
-                self.secret_out_text_label.setStyleSheet(
-                    "font-size: 16px; color: #00ff00; margin-bottom: 10px; font-weight: bold;")
-        except Exception as e:
-            QMessageBox.critical(self, "Revealing error", f"Failed to reveal the image.\n{e}")
+    def set_label_placeholder(self, label: QLabel, width: int, height: int, text: str):
+        label.setAlignment(Qt.AlignCenter)
+        label.setPixmap(self._placeholder_pixmap(width, height, text))
+        self.style_image_box(label)
 
-    def perform_encryption(self, filepath):
-        if filepath is None:
-            QMessageBox.information(self, "Encrypting Error", "Please select the image first.")
-            return
-        if not self.aes_radio.isChecked() and not self.blowfish_radio.isChecked():
-            QMessageBox.information(self, "Encrypting Error", "Please select an encryption method.")
-            return
-        if self.key_text_box.text() == "":
-            QMessageBox.information(self, "Encrypting Error", "Please enter a secret key")
-            return
-        try:
-            if self.aes_radio.isChecked():
-                aes.encrypt(filepath, self.key_text_box.text())
-                self.last_download_path = filepath + '.enc'
-            else:
-                blowfish.encrypt(filepath, self.key_text_box.text())
-                self.last_download_path = filepath + '.enc'
-            self.download_enc_button.setEnabled(True)
-            self.enc_img_text_label.setText("Encrypted!")
-            self.enc_img_text_label.setStyleSheet(
-                "font-size: 16px; color: #00ff00; margin-bottom: 10px; font-weight: bold;")
-            pixmap = QPixmap(os.path.join(BASE_DIR, "assets/dummy_images/locked_image_dummy.png"))
-            self.enc_display_label.setPixmap(pixmap.scaled(256, 256, Qt.KeepAspectRatio))
-            self.key_text_box.setText("")
-        except:
-            QMessageBox.critical(self, "Encrypting error", "Failed to encryp the image")
+    def style_image_box(self, label: QLabel):
+        label.setStyleSheet(
+            "border: 2px solid #d62828; border-radius: 8px; background-color: rgba(0,0,0,80);"
+        )
+        pm = label.pixmap()
+        if pm is not None:
+            label.setFixedSize(pm.width(), pm.height())
 
-    def perform_decryption(self, filepath):
-        dec_filename = None
-        if filepath is None:
-            QMessageBox.information(self, "Decrypting Error", "Please select the image first.")
-            return
-        if not self.aes_radio_dec.isChecked() and not self.blowfish_radio_dec.isChecked():
-            QMessageBox.information(self, "Decrypting Error", "Please select an decryption method.")
-            return
-        if self.key_text_box_of_dec.text() == "":
-            QMessageBox.information(self, "Decrypting Error", "Please enter a secret key")
-            return
+    def set_label_image_box(self, label: QLabel, image_path: str, box_width: int, box_height: int):
         try:
-            if self.aes_radio_dec.isChecked():
-                result, dec_filename = aes.decrypt(filepath, self.key_text_box_of_dec.text())
-                if result == -1:
-                    QMessageBox.critical(self, "Decrypting error", "Wrong Key!                   ")
-                    return
-            else:
-                result, dec_filename = blowfish.decrypt(filepath, self.key_text_box_of_dec.text())
-                if result == -1:
-                    QMessageBox.critical(self, "Decrypting error", "Wrong Key!                    ")
-                    return
-            self.download_dec_button.setEnabled(True)
-            self.dec_img_text_label.setText("Decrypted!")
-            self.dec_img_text_label.setStyleSheet(
-                "font-size: 16px; color: #00ff00; margin-bottom: 10px; font-weight: bold;")
-            pixmap = QPixmap(dec_filename)
-            self.dec_display_label.setPixmap(pixmap.scaled(256, 256, Qt.KeepAspectRatio))
-            self.last_download_path = dec_filename
-            self.key_text_box_of_dec.setText("")
-        except:
-            QMessageBox.critical(self, "Decrypting error", "Failed to decrypt the file")
+            src = QPixmap(image_path)
+            if src.isNull():
+                self.set_label_placeholder(label, box_width, box_height, "Select the image")
+                return
+            scaled = src.scaled(box_width, box_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            canvas = QPixmap(box_width, box_height)
+            canvas.fill(QColor(0, 0, 0, 0))
+            painter = QPainter(canvas)
+            x = (box_width - scaled.width()) // 2
+            y = (box_height - scaled.height()) // 2
+            painter.drawPixmap(x, y, scaled)
+            painter.end()
+            label.setPixmap(canvas)
+            label.setFixedSize(box_width, box_height)
+        except Exception:
+            self.set_label_placeholder(label, box_width, box_height, "Select the image")
 
     def logout(self):
         dialog = QDialog(self)
@@ -821,6 +804,262 @@ class MainAppWindow(QMainWindow):
         if stylesheet.open(QFile.ReadOnly | QFile.Text):
             stream = QTextStream(stylesheet)
             self.setStyleSheet(stream.readAll())
+
+    def show_home_page(self):
+        self.clear_main_layout()
+        # Apply page margins for full-width blocks
+        self.main_layout.setContentsMargins(16, 16, 16, 16)
+        # Logo on home page
+        logo_home = QLabel()
+        lp = QPixmap(os.path.join(PROJECT_ROOT, "logo.png"))
+        if not lp.isNull():
+            logo_home.setPixmap(lp.scaled(120, 120, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+        logo_home.setAlignment(Qt.AlignCenter)
+        self.main_layout.addWidget(logo_home)
+        # Title
+        title_label = QLabel("<h1>ImageSteganography</h1>")
+        title_label.setAlignment(Qt.AlignCenter)
+        title_label.setStyleSheet("font-size: 42px; color: #d62828; font-weight: 800; letter-spacing: 1px;")
+        self.main_layout.addWidget(title_label)
+
+        # Overview info (full paragraph)
+        info = QLabel(
+            "<div style='color:#f0f0f0; font-size:20px; text-align:center; line-height:1.9'>"
+            "ImageSteganography is a desktop application that lets you seamlessly embed a secret image inside a cover image "
+            "using a convolutional neural network. You can optionally secure files with AES or Blowfish encryption, recover the "
+            "hidden content later with the paired reveal model, and improve clarity of low‑resolution images using ESRGAN super‑resolution. "
+            "All workflows are available through an elegant, offline‑friendly PyQt interface."
+            "</div>"
+        )
+        info.setAlignment(Qt.AlignCenter)
+        info.setWordWrap(True)
+        info.setStyleSheet(
+            "background-color: transparent; padding: 16px 22px; border-radius: 10px;"
+        )
+        info.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Maximum)
+        self.main_layout.addWidget(info)
+
+        # Technologies section
+        tech_header = QLabel("<h3>Technologies Used</h3>")
+        tech_header.setAlignment(Qt.AlignCenter)
+        tech_header.setStyleSheet("color:#ffd1d1; font-size:26px; font-weight: 800;")
+        self.main_layout.addWidget(tech_header, alignment=Qt.AlignCenter)
+
+        def make_chip(text: str) -> QWidget:
+            chip = QLabel(text)
+            chip.setAlignment(Qt.AlignCenter)
+            chip.setStyleSheet(
+                "color:#ffffff; background-color: transparent;"
+                "padding: 10px 14px; border-radius: 12px; font-size: 16px; font-weight: 800;"
+            )
+            w = QWidget()
+            l = QVBoxLayout(w)
+            l.setContentsMargins(0,0,0,0)
+            l.addWidget(chip)
+            return w
+
+        tech_row_container = QWidget()
+        tech_row = QHBoxLayout(tech_row_container)
+        tech_row.setContentsMargins(0,0,0,0)
+        tech_row.setSpacing(10)
+        tech_row.addWidget(make_chip("TensorFlow/Keras"))
+        tech_row.addWidget(make_chip("PyTorch"))
+        tech_row.addWidget(make_chip("PyQt5"))
+        tech_row.addWidget(make_chip("OpenCV & NumPy"))
+        tech_row.addWidget(make_chip("PyCryptodome"))
+
+        # Put chips in a horizontal scroll to keep one row if needed
+        tech_scroll = QScrollArea()
+        tech_scroll.setWidgetResizable(True)
+        tech_scroll.setFrameShape(QScrollArea.NoFrame)
+        tech_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        tech_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        # make scroll area and its viewport transparent
+        tech_scroll.setStyleSheet("QScrollArea{background:transparent;} QScrollArea>Viewport{background:transparent;} QWidget{background:transparent;}")
+        tech_row_container.setAttribute(Qt.WA_TranslucentBackground, True)
+        tech_row_container.setAutoFillBackground(False)
+        tech_scroll.setWidget(tech_row_container)
+        tech_scroll.setMaximumHeight(70)
+        self.main_layout.addWidget(tech_scroll)
+
+        # Feature cards (tiny boxes) — one row with horizontal scroll if needed
+        def make_card(title: str, desc: str, on_click) -> QWidget:
+            card = QWidget()
+            card_layout = QVBoxLayout(card)
+            card_layout.setContentsMargins(12, 10, 12, 12)
+            t = QLabel(title)
+            t.setAlignment(Qt.AlignCenter)
+            t.setStyleSheet("color:#d62828; font-size:20px; font-weight:900;")
+            d = QLabel(desc)
+            d.setAlignment(Qt.AlignCenter)
+            d.setWordWrap(True)
+            d.setStyleSheet("color:#f0f0f0; font-size:15px; font-weight:600;")
+            card_layout.addWidget(t)
+            card_layout.addWidget(d)
+            card.setStyleSheet("background-color: transparent; border-radius: 10px;")
+            card.setFixedWidth(260)
+            card.setCursor(Qt.PointingHandCursor)
+            # Click handler
+            def _mp(_: object = None):
+                try:
+                    on_click()
+                except Exception:
+                    pass
+            card.mousePressEvent = lambda e: _mp()
+            return card
+
+        features_row_container = QWidget()
+        features_row_container.setAttribute(Qt.WA_TranslucentBackground, True)
+        features_row_container.setAutoFillBackground(False)
+        features_row = QHBoxLayout(features_row_container)
+        features_row.setContentsMargins(0,0,0,0)
+        features_row.setSpacing(16)
+        features_row.addWidget(make_card("Hide", "Embed a secret image into a cover image using a CNN (auto‑resized to 224×224).", self.show_image_hiding_page))
+        features_row.addWidget(make_card("Reveal", "Recover the hidden secret image from a stego image using the paired model.", self.show_reveal_page))
+        features_row.addWidget(make_card("Encrypt", "Protect files with AES or Blowfish in CBC mode (key‑derived via SHA‑256).", self.show_encryption_page))
+        features_row.addWidget(make_card("Upscale", "Enhance image quality using ESRGAN ×4 (CPU/GPU).", self.show_super_resolution_page))
+
+        features_scroll = QScrollArea()
+        features_scroll.setWidgetResizable(True)
+        features_scroll.setFrameShape(QScrollArea.NoFrame)
+        features_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        features_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        # make features scroll area transparent
+        features_scroll.setStyleSheet("QScrollArea{background:transparent;} QScrollArea>Viewport{background:transparent;} QWidget{background:transparent;}")
+        features_scroll.setWidget(features_row_container)
+        features_scroll.setMaximumHeight(180)
+        self.main_layout.addWidget(features_scroll)
+
+    def show_login_dialog(self):
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Log in")
+        layout = QVBoxLayout(dialog)
+        layout.addWidget(QLabel("Username"))
+        username = QLineEdit()
+        layout.addWidget(username)
+        layout.addWidget(QLabel("Password"))
+        password = QLineEdit()
+        password.setEchoMode(QLineEdit.Password)
+        layout.addWidget(password)
+        row = QHBoxLayout()
+        ok = QPushButton("OK")
+        cancel = QPushButton("Cancel")
+        ok.clicked.connect(dialog.accept)
+        cancel.clicked.connect(dialog.reject)
+        row.addWidget(ok)
+        row.addWidget(cancel)
+        layout.addLayout(row)
+        dialog.exec_()
+
+    def show_signup_dialog(self):
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Sign up")
+        layout = QVBoxLayout(dialog)
+        layout.addWidget(QLabel("Email"))
+        email = QLineEdit()
+        layout.addWidget(email)
+        layout.addWidget(QLabel("Password"))
+        password = QLineEdit()
+        password.setEchoMode(QLineEdit.Password)
+        layout.addWidget(password)
+        layout.addWidget(QLabel("Confirm Password"))
+        confirm = QLineEdit()
+        confirm.setEchoMode(QLineEdit.Password)
+        layout.addWidget(confirm)
+        row = QHBoxLayout()
+        ok = QPushButton("Create Account")
+        cancel = QPushButton("Cancel")
+        ok.clicked.connect(dialog.accept)
+        cancel.clicked.connect(dialog.reject)
+        row.addWidget(ok)
+        row.addWidget(cancel)
+        layout.addLayout(row)
+        dialog.exec_()
+
+    def perform_hide(self, cover_filepath: str, secret_filepath: str):
+        if not cover_filepath or not secret_filepath:
+            QMessageBox.information(self, "Hiding Error", "Please select the cover and secret images first.")
+            return
+        try:
+            steg_image_path = hide_image(cover_filepath, secret_filepath)
+            self.set_label_image_box(self.steg_display_label, steg_image_path, 256, 256)
+            self.download_steg_button.setEnabled(True)
+            self.last_download_path = steg_image_path
+            if hasattr(self, 'steg_text_label') and self.steg_text_label is not None:
+                self.steg_text_label.setText("Image Hidden Successfully!")
+                self.steg_text_label.setStyleSheet("font-size: 16px; color: #00ff00; margin-bottom: 10px; font-weight: bold;")
+        except Exception as e:
+            QMessageBox.critical(self, "Hiding Error", f"Failed to hide the image.\n{e}")
+
+    def perform_reveal(self, filepath: str):
+        if not filepath:
+            QMessageBox.information(self, "Revealing Error", "Please select the steg image first.")
+            return
+        try:
+            secret_out_filepath = reveal_image(filepath)
+            self.set_label_image_box(self.secret_out_display_label, secret_out_filepath, 256, 256)
+            self.download_revealed_secret_image_button.setEnabled(True)
+            self.last_download_path = secret_out_filepath
+            if hasattr(self, 'secret_out_text_label') and self.secret_out_text_label is not None:
+                self.secret_out_text_label.setText("Image Revealed Successfully!")
+                self.secret_out_text_label.setStyleSheet("font-size: 16px; color: #00ff00; margin-bottom: 10px; font-weight: bold;")
+        except Exception as e:
+            QMessageBox.critical(self, "Revealing Error", f"Failed to reveal the image.\n{e}")
+
+    def perform_encryption(self, filepath: str):
+        if not filepath:
+            QMessageBox.information(self, "Encrypting Error", "Please select the image first.")
+            return
+        if not (self.aes_radio.isChecked() or self.blowfish_radio.isChecked()):
+            QMessageBox.information(self, "Encrypting Error", "Please select an encryption method.")
+            return
+        if self.key_text_box.text() == "":
+            QMessageBox.information(self, "Encrypting Error", "Please enter a secret key.")
+            return
+        try:
+            if self.aes_radio.isChecked():
+                aes.encrypt(filepath, self.key_text_box.text())
+            else:
+                blowfish.encrypt(filepath, self.key_text_box.text())
+            self.last_download_path = filepath + '.enc'
+            self.download_enc_button.setEnabled(True)
+            if self.enc_img_text_label is not None:
+                self.enc_img_text_label.setText("Encrypted!")
+                self.enc_img_text_label.setStyleSheet("font-size: 16px; color: #00ff00; margin-bottom: 10px; font-weight: bold;")
+            self.key_text_box.setText("")
+        except Exception as e:
+            QMessageBox.critical(self, "Encrypting Error", f"Failed to encrypt the image.\n{e}")
+
+    def perform_decryption(self, filepath: str):
+        if not filepath:
+            QMessageBox.information(self, "Decrypting Error", "Please select the encrypted file first.")
+            return
+        if not (self.aes_radio_dec.isChecked() or self.blowfish_radio_dec.isChecked()):
+            QMessageBox.information(self, "Decrypting Error", "Please select a decryption method.")
+            return
+        if self.key_text_box_of_dec.text() == "":
+            QMessageBox.information(self, "Decrypting Error", "Please enter a secret key.")
+            return
+        try:
+            result = 0
+            dec_filename = None
+            if self.aes_radio_dec.isChecked():
+                result, dec_filename = aes.decrypt(filepath, self.key_text_box_of_dec.text())
+            else:
+                result, dec_filename = blowfish.decrypt(filepath, self.key_text_box_of_dec.text())
+            if result == -1 or not dec_filename:
+                QMessageBox.critical(self, "Decrypting Error", "Wrong key or failed to decrypt.")
+                return
+            self.download_dec_button.setEnabled(True)
+            if self.dec_img_text_label is not None:
+                self.dec_img_text_label.setText("Decrypted!")
+                self.dec_img_text_label.setStyleSheet("font-size: 16px; color: #00ff00; margin-bottom: 10px; font-weight: bold;")
+            # Show decrypted output in the box
+            self.set_label_image_box(self.dec_display_label, dec_filename, 256, 256)
+            self.last_download_path = dec_filename
+            self.key_text_box_of_dec.setText("")
+        except Exception as e:
+            QMessageBox.critical(self, "Decrypting Error", f"Failed to decrypt the file.\n{e}")
 
 
 # Create the application
