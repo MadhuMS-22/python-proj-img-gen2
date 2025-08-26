@@ -5,6 +5,7 @@ import cv2
 import shutil
 import numpy as np
 import torch
+import requests
 from PyQt5.QtCore import QFile, QTextStream
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon, QPixmap, QFont, QPainter, QColor
@@ -25,6 +26,7 @@ from app.ui.components.customtextbox import CustomTextBox
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # Project root (InvisiCipher/) two levels up from ui/
 PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, "..", ".."))
+BACKEND_BASE_URL = "http://127.0.0.1:8000"
 
 class MainAppWindow(QMainWindow):
     def __init__(self):
@@ -120,8 +122,8 @@ class MainAppWindow(QMainWindow):
         # Auth buttons below navigation
         login_button = QPushButton("Log in")
         signup_button = QPushButton("Sign up")
-        login_button.clicked.connect(self.show_login_dialog)
-        signup_button.clicked.connect(self.show_signup_dialog)
+        login_button.clicked.connect(self.show_login_page)
+        signup_button.clicked.connect(self.show_signup_page)
         side_layout.addWidget(login_button)
         side_layout.addWidget(signup_button)
 
@@ -929,51 +931,135 @@ class MainAppWindow(QMainWindow):
         features_scroll.setMaximumHeight(180)
         self.main_layout.addWidget(features_scroll)
 
-    def show_login_dialog(self):
-        dialog = QDialog(self)
-        dialog.setWindowTitle("Log in")
-        layout = QVBoxLayout(dialog)
-        layout.addWidget(QLabel("Username"))
-        username = QLineEdit()
-        layout.addWidget(username)
-        layout.addWidget(QLabel("Password"))
-        password = QLineEdit()
-        password.setEchoMode(QLineEdit.Password)
-        layout.addWidget(password)
-        row = QHBoxLayout()
-        ok = QPushButton("OK")
-        cancel = QPushButton("Cancel")
-        ok.clicked.connect(dialog.accept)
-        cancel.clicked.connect(dialog.reject)
-        row.addWidget(ok)
-        row.addWidget(cancel)
-        layout.addLayout(row)
-        dialog.exec_()
+    def show_login_page(self):
+        self.clear_main_layout()
+        container = QWidget()
+        row = QHBoxLayout(container)
+        row.setContentsMargins(0,0,0,0)
+        row.setSpacing(0)
 
-    def show_signup_dialog(self):
-        dialog = QDialog(self)
-        dialog.setWindowTitle("Sign up")
-        layout = QVBoxLayout(dialog)
-        layout.addWidget(QLabel("Email"))
-        email = QLineEdit()
-        layout.addWidget(email)
-        layout.addWidget(QLabel("Password"))
-        password = QLineEdit()
-        password.setEchoMode(QLineEdit.Password)
-        layout.addWidget(password)
-        layout.addWidget(QLabel("Confirm Password"))
-        confirm = QLineEdit()
-        confirm.setEchoMode(QLineEdit.Password)
-        layout.addWidget(confirm)
-        row = QHBoxLayout()
-        ok = QPushButton("Create Account")
-        cancel = QPushButton("Cancel")
-        ok.clicked.connect(dialog.accept)
-        cancel.clicked.connect(dialog.reject)
-        row.addWidget(ok)
-        row.addWidget(cancel)
-        layout.addLayout(row)
-        dialog.exec_()
+        # Left column
+        left = QWidget()
+        left_layout = QVBoxLayout(left)
+        left_layout.addStretch()
+        logo = QLabel()
+        lp = QPixmap(os.path.join(PROJECT_ROOT, "logo.png"))
+        if not lp.isNull():
+            logo.setPixmap(lp.scaled(120, 120, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+        logo.setAlignment(Qt.AlignCenter)
+        name = QLabel("<h1>ImageSteganography</h1>")
+        name.setAlignment(Qt.AlignCenter)
+        left_layout.addWidget(logo)
+        left_layout.addWidget(name)
+        left_layout.addStretch()
+
+        # Right column (form)
+        right = QWidget()
+        form = QVBoxLayout(right)
+        form.setContentsMargins(60,60,60,60)
+        title = QLabel("<h2>Log In</h2>")
+        form.addWidget(title)
+        id_label = QLabel("Username or Email")
+        id_input = CustomTextBox()
+        pwd_label = QLabel("Password")
+        pwd_input = CustomTextBox()
+        pwd_input.setEchoMode(QLineEdit.Password)
+        submit = QPushButton("Log In")
+        submit.clicked.connect(lambda: self._login_request(id_input.text(), pwd_input.text()))
+        form.addWidget(id_label)
+        form.addWidget(id_input)
+        form.addWidget(pwd_label)
+        form.addWidget(pwd_input)
+        form.addWidget(submit)
+
+        # Assemble 50/50
+        left.setFixedWidth(700)
+        row.addWidget(left)
+        row.addWidget(right)
+        self.main_layout.addWidget(container)
+
+    def show_signup_page(self):
+        self.clear_main_layout()
+        container = QWidget()
+        row = QHBoxLayout(container)
+        row.setContentsMargins(0,0,0,0)
+        row.setSpacing(0)
+
+        # Left column
+        left = QWidget()
+        left_layout = QVBoxLayout(left)
+        left_layout.addStretch()
+        logo = QLabel()
+        lp = QPixmap(os.path.join(PROJECT_ROOT, "logo.png"))
+        if not lp.isNull():
+            logo.setPixmap(lp.scaled(120, 120, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+        logo.setAlignment(Qt.AlignCenter)
+        name = QLabel("<h1>ImageSteganography</h1>")
+        name.setAlignment(Qt.AlignCenter)
+        left_layout.addWidget(logo)
+        left_layout.addWidget(name)
+        left_layout.addStretch()
+
+        # Right column (form)
+        right = QWidget()
+        form = QVBoxLayout(right)
+        form.setContentsMargins(60,60,60,60)
+        title = QLabel("<h2>Sign Up</h2>")
+        form.addWidget(title)
+        fn_label = QLabel("Full Name")
+        fn_input = CustomTextBox()
+        em_label = QLabel("Email Address")
+        em_input = CustomTextBox()
+        ph_label = QLabel("Phone Number")
+        ph_input = CustomTextBox()
+        un_label = QLabel("Username")
+        un_input = CustomTextBox()
+        pw_label = QLabel("Password")
+        pw_input = CustomTextBox()
+        pw_input.setEchoMode(QLineEdit.Password)
+        submit = QPushButton("Sign Up")
+        submit.clicked.connect(lambda: self._signup_request(fn_input.text(), em_input.text(), ph_input.text(), un_input.text(), pw_input.text()))
+        for w in [fn_label, fn_input, em_label, em_input, ph_label, ph_input, un_label, un_input, pw_label, pw_input, submit]:
+            form.addWidget(w)
+
+        # Assemble 50/50
+        left.setFixedWidth(700)
+        row.addWidget(left)
+        row.addWidget(right)
+        self.main_layout.addWidget(container)
+
+    def _signup_request(self, full_name: str, email: str, phone: str, username: str, password: str):
+        try:
+            r = requests.post(f"{BACKEND_BASE_URL}/api/auth/signup", json={
+                "full_name": full_name,
+                "email": email,
+                "phone": phone,
+                "username": username,
+                "password": password
+            }, timeout=10)
+            if r.status_code == 201:
+                QMessageBox.information(self, "Sign Up", "Account created. Please log in.")
+                self.show_login_page()
+            else:
+                QMessageBox.critical(self, "Sign Up Error", r.text)
+        except Exception as e:
+            QMessageBox.critical(self, "Sign Up Error", str(e))
+
+    def _login_request(self, identifier: str, password: str):
+        try:
+            r = requests.post(f"{BACKEND_BASE_URL}/api/auth/login", json={
+                "identifier": identifier,
+                "password": password
+            }, timeout=10)
+            if r.status_code == 200:
+                data = r.json()
+                self.auth_token = data.get("token")
+                QMessageBox.information(self, "Log In", f"Welcome {data.get('user',{}).get('username','')}!")
+                self.show_home_page()
+            else:
+                QMessageBox.critical(self, "Log In Error", r.text)
+        except Exception as e:
+            QMessageBox.critical(self, "Log In Error", str(e))
 
     def perform_hide(self, cover_filepath: str, secret_filepath: str):
         if not cover_filepath or not secret_filepath:

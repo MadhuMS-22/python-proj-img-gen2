@@ -6,3 +6,10 @@ pycryptodome
 PyQt5
 numpy
 imageio
+fastapi
+uvicorn
+SQLAlchemy
+pydantic
+bcrypt
+python-jose[cryptography]
+requests
