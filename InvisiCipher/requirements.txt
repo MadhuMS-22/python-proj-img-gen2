@@ -1,15 +1,30 @@
-tensorflow==2.10.0
-torch
-opencv-python
-Pillow
-pycryptodome
-PyQt5
-numpy
-imageio
-fastapi
-uvicorn
-SQLAlchemy
-pydantic
-bcrypt
-python-jose[cryptography]
-requests
+# Core ML Libraries
+tensorflow-cpu==2.16.1
+torch==2.8.0
+opencv-python==4.11.0.86
+Pillow==11.3.0
+
+# Cryptography
+pycryptodome==3.23.0
+
+# GUI Framework
+PyQt5==5.15.11
+
+# Data Processing
+numpy==1.26.4
+imageio==2.37.0
+
+# Backend Framework
+fastapi==0.116.1
+uvicorn==0.35.0
+SQLAlchemy==2.0.43
+pydantic==2.11.7
+
+# Authentication & Security
+bcrypt==4.3.0
+python-jose[cryptography]==3.5.0
+requests==2.32.5
+email-validator==2.3.0
+
+# Additional Dependencies
+python-multipart==0.0.20

@@ -1,1 +1,5 @@
-.idea/
+.idea/.venv/
+__pycache__/
+*.pyc
+invisicipher_auth.db
+.DS_Store

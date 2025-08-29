@@ -6,6 +6,8 @@ import shutil
 import numpy as np
 import torch
 import requests
+import subprocess
+import time
 from PyQt5.QtCore import QFile, QTextStream
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon, QPixmap, QFont, QPainter, QColor
@@ -21,6 +23,7 @@ from app.models.ESRGAN import RRDBNet_arch as arch
 from app.models.encryption import aes, blowfish
 from app.ui.components.backgroundwidget import BackgroundWidget
 from app.ui.components.customtextbox import CustomTextBox
+from app.ui.auth_screen import show_auth_screen
 
 # Get the base directory for assets
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -32,8 +35,11 @@ class MainAppWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         # vars
+        self.is_authenticated = False
+        self.auth_token = None
         self.last_download_path = None
         self.main_content = None
+        self.side_navigation = None  # Store reference to sidebar
         self.blowfish_radio_dec = None
         self.aes_radio_dec = None
         self.key_text_box_of_dec = None
@@ -74,13 +80,13 @@ class MainAppWindow(QMainWindow):
         main_layout = QHBoxLayout()
 
         # Create the side navigation bar
-        side_navigation = BackgroundWidget()
+        self.side_navigation = BackgroundWidget()
         # Set sidebar background image from project root (vertical menu background)
         menubg_path = os.path.join(PROJECT_ROOT, "menubg.jpg")
         if os.path.exists(menubg_path):
-            side_navigation.set_background_image(menubg_path)
-        side_navigation.setObjectName("side_navigation")
-        side_navigation.setFixedWidth(200)
+            self.side_navigation.set_background_image(menubg_path)
+        self.side_navigation.setObjectName("side_navigation")
+        self.side_navigation.setFixedWidth(200)
         side_layout = QVBoxLayout()
 
         # label for logo
@@ -119,23 +125,16 @@ class MainAppWindow(QMainWindow):
         side_layout.addWidget(decryption_button)
         side_layout.addWidget(image_reveal_button)
         side_layout.addWidget(super_resolution_button)
-        # Auth buttons below navigation
-        login_button = QPushButton("Log in")
-        signup_button = QPushButton("Sign up")
-        login_button.clicked.connect(self.show_login_page)
-        signup_button.clicked.connect(self.show_signup_page)
-        side_layout.addWidget(login_button)
-        side_layout.addWidget(signup_button)
 
         # Add a logout button
-        logout_button = QPushButton("Exit")
+        logout_button = QPushButton("Logout")
         logout_button.setObjectName("logout_button")
         logout_button.clicked.connect(self.logout)
         side_layout.addStretch()
         side_layout.addWidget(logout_button)
 
         # Set the layout for the side navigation widget
-        side_navigation.setLayout(side_layout)
+        self.side_navigation.setLayout(side_layout)
 
         # Create the main content area
         self.main_content = BackgroundWidget()
@@ -148,7 +147,7 @@ class MainAppWindow(QMainWindow):
         self.main_content.setLayout(self.main_layout)
 
         # Add the side navigation and main content to the main window layout (scrollable)
-        main_layout.addWidget(side_navigation)
+        main_layout.addWidget(self.side_navigation)
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
         scroll_area.setFrameShape(QScrollArea.NoFrame)
@@ -160,10 +159,41 @@ class MainAppWindow(QMainWindow):
         central_widget.setLayout(main_layout)
         self.setCentralWidget(central_widget)
 
-        # Populate home page content
-        self.show_home_page()
+        # Hide sidebar initially until authentication
+        self.side_navigation.hide()
+
+        # Ensure backend is running, then show auth screen first
+        self.ensure_backend_running()
+        show_auth_screen(self)
+
+    def ensure_backend_running(self):
+        try:
+            requests.get(f"{BACKEND_BASE_URL}/docs", timeout=1)
+            return
+        except Exception:
+            pass
+        try:
+            self._backend_proc = subprocess.Popen(
+                [sys.executable, "-m", "uvicorn", "backend.main:app", "--host", "127.0.0.1", "--port", "8000"],
+                cwd=PROJECT_ROOT,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            for _ in range(20):
+                try:
+                    time.sleep(0.2)
+                    requests.get(f"{BACKEND_BASE_URL}/docs", timeout=0.5)
+                    return
+                except Exception:
+                    continue
+        except Exception:
+            return
 
     def show_encryption_page(self):
+        if not self.is_authenticated:
+            QMessageBox.information(self, "Authentication Required", "Please log in to use this feature.")
+            show_auth_screen(self)
+            return
         # ensure bg applied
         bg_path = os.path.join(PROJECT_ROOT, "bg.jpg")
         if os.path.exists(bg_path):
@@ -258,6 +288,10 @@ class MainAppWindow(QMainWindow):
         self.main_layout.addWidget(button_layout_widget)
 
     def show_decryption_page(self):
+        if not self.is_authenticated:
+            QMessageBox.information(self, "Authentication Required", "Please log in to use this feature.")
+            show_auth_screen(self)
+            return
         bg_path = os.path.join(PROJECT_ROOT, "bg.jpg")
         if os.path.exists(bg_path):
             self.main_content.set_background_image(bg_path)
@@ -350,6 +384,10 @@ class MainAppWindow(QMainWindow):
         self.main_layout.addWidget(button_layout_widget)
 
     def show_image_hiding_page(self):
+        if not self.is_authenticated:
+            QMessageBox.information(self, "Authentication Required", "Please log in to use this feature.")
+            show_auth_screen(self)
+            return
         bg_path = os.path.join(PROJECT_ROOT, "bg.jpg")
         if os.path.exists(bg_path):
             self.main_content.set_background_image(bg_path)
@@ -448,6 +486,10 @@ class MainAppWindow(QMainWindow):
         self.main_layout.addWidget(button_layout_widget)
 
     def show_reveal_page(self):
+        if not self.is_authenticated:
+            QMessageBox.information(self, "Authentication Required", "Please log in to use this feature.")
+            show_auth_screen(self)
+            return
         bg_path = os.path.join(PROJECT_ROOT, "bg.jpg")
         if os.path.exists(bg_path):
             self.main_content.set_background_image(bg_path)
@@ -529,6 +571,10 @@ class MainAppWindow(QMainWindow):
         self.main_layout.addWidget(button_layout_widget)
 
     def show_super_resolution_page(self):
+        if not self.is_authenticated:
+            QMessageBox.information(self, "Authentication Required", "Please log in to use this feature.")
+            show_auth_screen(self)
+            return
         bg_path = os.path.join(PROJECT_ROOT, "bg.jpg")
         if os.path.exists(bg_path):
             self.main_content.set_background_image(bg_path)
@@ -768,37 +814,13 @@ class MainAppWindow(QMainWindow):
             self.set_label_placeholder(label, box_width, box_height, "Select the image")
 
     def logout(self):
-        dialog = QDialog(self)
-        dialog.setWindowTitle("Exit")
-        dialog.setMinimumSize(450, 100)
-
-        layout = QVBoxLayout(dialog)
-        msg_box = QMessageBox()
-        msg_box.setText("<h3>Are you sure you want to Exit?</h3>")
-
-        # Set custom font and size
-        font = QFont("Arial", 12)  # Adjust the font and size as desired
-        msg_box.setFont(font)
-
-        button_layout = QHBoxLayout()
-        layout.addWidget(msg_box)
-        layout.addLayout(button_layout)
-
-        # Remove the standard buttons
-        msg_box.setStandardButtons(QMessageBox.NoButton)
-
-        yes_button = QPushButton("Yes")
-        yes_button.setStyleSheet("color: #000000;")
-        yes_button.clicked.connect(lambda: QApplication.quit())
-
-        no_button = QPushButton("No")
-        no_button.setStyleSheet("color: #000000;")
-        no_button.clicked.connect(dialog.reject)
-
-        button_layout.addWidget(yes_button)
-        button_layout.addWidget(no_button)
-
-        dialog.exec_()
+        # Clear auth state and return to auth screen without exiting app
+        self.is_authenticated = False
+        self.auth_token = None
+        # Hide sidebar when logging out
+        self.side_navigation.hide()
+        QMessageBox.information(self, "Logged Out", "You have been logged out.")
+        show_auth_screen(self)
 
     def load_stylesheet(self):
         stylesheet = QFile(os.path.join(BASE_DIR, "styles/style.qss"))
@@ -808,6 +830,9 @@ class MainAppWindow(QMainWindow):
 
     def show_home_page(self):
         self.clear_main_layout()
+        if not self.is_authenticated:
+            show_auth_screen(self)
+            return
         # Apply page margins for full-width blocks
         self.main_layout.setContentsMargins(16, 16, 16, 16)
         # Logo on home page
@@ -932,103 +957,313 @@ class MainAppWindow(QMainWindow):
         self.main_layout.addWidget(features_scroll)
 
     def show_login_page(self):
+        # Set background image
+        bg_path = os.path.join(PROJECT_ROOT, "bg.jpg")
+        if os.path.exists(bg_path):
+            self.main_content.set_background_image(bg_path)
+        
         self.clear_main_layout()
+        
+        # Main container with fixed height to prevent scrolling
         container = QWidget()
-        row = QHBoxLayout(container)
-        row.setContentsMargins(0,0,0,0)
-        row.setSpacing(0)
+        container.setStyleSheet("background: transparent;")
+        main_layout = QVBoxLayout(container)
+        main_layout.setContentsMargins(20, 20, 20, 20)
+        main_layout.setSpacing(15)
 
-        # Left column
-        left = QWidget()
-        left_layout = QVBoxLayout(left)
-        left_layout.addStretch()
+        # Compact header section
+        header_widget = QWidget()
+        header_widget.setStyleSheet("background: transparent;")
+        header_layout = QVBoxLayout(header_widget)
+        header_layout.setSpacing(8)
+        header_layout.setContentsMargins(0, 0, 0, 0)
+        
         logo = QLabel()
         lp = QPixmap(os.path.join(PROJECT_ROOT, "logo.png"))
         if not lp.isNull():
-            logo.setPixmap(lp.scaled(120, 120, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            logo.setPixmap(lp.scaled(70, 70, Qt.KeepAspectRatio, Qt.SmoothTransformation))
         logo.setAlignment(Qt.AlignCenter)
-        name = QLabel("<h1>ImageSteganography</h1>")
+        
+        name = QLabel("<h2 style='color: #ffffff; font-size: 26px; font-weight: bold; margin: 0;'>InvisiCipher</h2>")
         name.setAlignment(Qt.AlignCenter)
-        left_layout.addWidget(logo)
-        left_layout.addWidget(name)
-        left_layout.addStretch()
-
-        # Right column (form)
-        right = QWidget()
-        form = QVBoxLayout(right)
-        form.setContentsMargins(60,60,60,60)
-        title = QLabel("<h2>Log In</h2>")
-        form.addWidget(title)
+        name.setStyleSheet("color: #ffffff; margin: 0; padding: 0; background: transparent;")
+        
+        subtitle = QLabel("<p style='color: #cccccc; font-size: 16px; margin: 0;'>Secure Image Steganography</p>")
+        subtitle.setAlignment(Qt.AlignCenter)
+        subtitle.setStyleSheet("color: #cccccc; margin: 0; padding: 0; background: transparent;")
+        
+        header_layout.addWidget(logo)
+        header_layout.addWidget(name)
+        header_layout.addWidget(subtitle)
+        
+        # Login form container - optimal width for login form
+        form_container = QWidget()
+        optimal_width = min(450, int(self.width() * 0.35))
+        form_container.setFixedWidth(max(350, optimal_width))
+        form_container.setStyleSheet("""
+            QWidget {
+                background-color: rgba(40, 40, 40, 0.85);
+                border-radius: 12px;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+            }
+        """)
+        
+        form_layout = QVBoxLayout(form_container)
+        form_layout.setSpacing(18)
+        form_layout.setContentsMargins(30, 35, 30, 35)
+        
+        # Form title
+        title = QLabel("<h3 style='color: #ffffff; font-size: 22px; font-weight: bold; text-align: center; margin: 0; border: none;'>Log In</h3>")
+        title.setAlignment(Qt.AlignCenter)
+        title.setStyleSheet("color: #ffffff; margin-bottom: 15px; background: transparent; border: none;")
+        
+        # Form fields with larger labels
         id_label = QLabel("Username or Email")
+        id_label.setStyleSheet("color: #ffffff; font-size: 14px; font-weight: 500; background: transparent; border: none;")
         id_input = CustomTextBox()
+        id_input.setStyleSheet("""
+            QLineEdit {
+                padding: 8px 12px;
+                border: 1px solid #555555;
+                border-radius: 6px;
+                background-color: rgba(60, 60, 60, 0.8);
+                color: #ffffff;
+                font-size: 13px;
+                min-height: 16px;
+            }
+            QLineEdit:focus {
+                border-color: #007acc;
+                background-color: rgba(70, 70, 70, 0.9);
+            }
+        """)
+        
         pwd_label = QLabel("Password")
+        pwd_label.setStyleSheet("color: #ffffff; font-size: 14px; font-weight: 500; background: transparent; border: none;")
         pwd_input = CustomTextBox()
         pwd_input.setEchoMode(QLineEdit.Password)
+        pwd_input.setStyleSheet("""
+            QLineEdit {
+                padding: 8px 12px;
+                border: 1px solid #555555;
+                border-radius: 6px;
+                background-color: rgba(60, 60, 60, 0.8);
+                color: #ffffff;
+                font-size: 13px;
+                min-height: 16px;
+            }
+            QLineEdit:focus {
+                border-color: #007acc;
+                background-color: rgba(70, 70, 70, 0.9);
+            }
+        """)
+        
         submit = QPushButton("Log In")
+        submit.setStyleSheet("""
+            QPushButton {
+                background-color: #dc3545;
+                color: white;
+                border: none;
+                padding: 10px 25px;
+                border-radius: 6px;
+                font-size: 14px;
+                font-weight: bold;
+                min-height: 16px;
+            }
+            QPushButton:hover {
+                background-color: #c82333;
+            }
+            QPushButton:pressed {
+                background-color: #bd2130;
+            }
+        """)
         submit.clicked.connect(lambda: self._login_request(id_input.text(), pwd_input.text()))
-        form.addWidget(id_label)
-        form.addWidget(id_input)
-        form.addWidget(pwd_label)
-        form.addWidget(pwd_input)
-        form.addWidget(submit)
-
-        # Assemble 50/50
-        left.setFixedWidth(700)
-        row.addWidget(left)
-        row.addWidget(right)
+        
+        # Add widgets to form
+        form_layout.addWidget(title)
+        form_layout.addWidget(id_label)
+        form_layout.addWidget(id_input)
+        form_layout.addWidget(pwd_label)
+        form_layout.addWidget(pwd_input)
+        form_layout.addWidget(submit)
+        
+        # Center the form horizontally
+        form_center_layout = QHBoxLayout()
+        form_center_layout.addStretch()
+        form_center_layout.addWidget(form_container)
+        form_center_layout.addStretch()
+        
+        # Add sections with controlled spacing
+        main_layout.addWidget(header_widget)
+        main_layout.addLayout(form_center_layout)
+        main_layout.addStretch()
+        
         self.main_layout.addWidget(container)
 
     def show_signup_page(self):
+        # Set background image
+        bg_path = os.path.join(PROJECT_ROOT, "bg.jpg")
+        if os.path.exists(bg_path):
+            self.main_content.set_background_image(bg_path)
+        
         self.clear_main_layout()
+        
+        # Main container with transparent background
         container = QWidget()
-        row = QHBoxLayout(container)
-        row.setContentsMargins(0,0,0,0)
-        row.setSpacing(0)
+        container.setStyleSheet("background: transparent;")
+        main_layout = QVBoxLayout(container)
+        main_layout.setContentsMargins(20, 15, 20, 15)
+        main_layout.setSpacing(10)
 
-        # Left column
-        left = QWidget()
-        left_layout = QVBoxLayout(left)
-        left_layout.addStretch()
+        # Compact header section
+        header_widget = QWidget()
+        header_widget.setStyleSheet("background: transparent;")
+        header_layout = QVBoxLayout(header_widget)
+        header_layout.setSpacing(6)
+        header_layout.setContentsMargins(0, 0, 0, 0)
+        
         logo = QLabel()
         lp = QPixmap(os.path.join(PROJECT_ROOT, "logo.png"))
         if not lp.isNull():
-            logo.setPixmap(lp.scaled(120, 120, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            logo.setPixmap(lp.scaled(60, 60, Qt.KeepAspectRatio, Qt.SmoothTransformation))
         logo.setAlignment(Qt.AlignCenter)
-        name = QLabel("<h1>ImageSteganography</h1>")
+        
+        name = QLabel("<h3 style='color: #ffffff; font-size: 24px; font-weight: bold; margin: 0;'>InvisiCipher</h3>")
         name.setAlignment(Qt.AlignCenter)
-        left_layout.addWidget(logo)
-        left_layout.addWidget(name)
-        left_layout.addStretch()
-
-        # Right column (form)
-        right = QWidget()
-        form = QVBoxLayout(right)
-        form.setContentsMargins(60,60,60,60)
-        title = QLabel("<h2>Sign Up</h2>")
-        form.addWidget(title)
+        name.setStyleSheet("color: #ffffff; margin: 0; padding: 0; background: transparent;")
+        
+        subtitle = QLabel("<p style='color: #cccccc; font-size: 14px; margin: 0;'>Secure Image Steganography</p>")
+        subtitle.setAlignment(Qt.AlignCenter)
+        subtitle.setStyleSheet("color: #cccccc; margin: 0; padding: 0; background: transparent;")
+        
+        header_layout.addWidget(logo)
+        header_layout.addWidget(name)
+        header_layout.addWidget(subtitle)
+        
+        # Signup form container - optimal width for signup form
+        form_container = QWidget()
+        optimal_width = min(600, int(self.width() * 0.45))
+        form_container.setFixedWidth(max(450, optimal_width))
+        form_container.setStyleSheet("""
+            QWidget {
+                background-color: rgba(40, 40, 40, 0.85);
+                border-radius: 12px;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+            }
+        """)
+        
+        form_layout = QVBoxLayout(form_container)
+        form_layout.setSpacing(12)
+        form_layout.setContentsMargins(30, 30, 30, 30)
+        
+        # Form title
+        title = QLabel("<h4 style='color: #ffffff; font-size: 20px; font-weight: bold; text-align: center; margin: 0; border: none;'>Sign Up</h4>")
+        title.setAlignment(Qt.AlignCenter)
+        title.setStyleSheet("color: #ffffff; margin-bottom: 12px; background: transparent; border: none;")
+        
+        # Compact input and label styles
+        input_style = """
+            QLineEdit {
+                padding: 6px 10px;
+                border: 1px solid #555555;
+                border-radius: 5px;
+                background-color: rgba(60, 60, 60, 0.8);
+                color: #ffffff;
+                font-size: 12px;
+                min-height: 14px;
+            }
+            QLineEdit:focus {
+                border-color: #007acc;
+                background-color: rgba(70, 70, 70, 0.9);
+            }
+        """
+        
+        label_style = "color: #ffffff; font-size: 13px; font-weight: 500; background: transparent; border: none;"
+        
+        # Form fields
         fn_label = QLabel("Full Name")
+        fn_label.setStyleSheet(label_style)
         fn_input = CustomTextBox()
+        fn_input.setStyleSheet(input_style)
+        
         em_label = QLabel("Email Address")
+        em_label.setStyleSheet(label_style)
         em_input = CustomTextBox()
+        em_input.setStyleSheet(input_style)
+        
         ph_label = QLabel("Phone Number")
+        ph_label.setStyleSheet(label_style)
         ph_input = CustomTextBox()
+        ph_input.setStyleSheet(input_style)
+        
         un_label = QLabel("Username")
+        un_label.setStyleSheet(label_style)
         un_input = CustomTextBox()
+        un_input.setStyleSheet(input_style)
+        
         pw_label = QLabel("Password")
+        pw_label.setStyleSheet(label_style)
         pw_input = CustomTextBox()
         pw_input.setEchoMode(QLineEdit.Password)
+        pw_input.setStyleSheet(input_style)
+        
         submit = QPushButton("Sign Up")
+        submit.setStyleSheet("""
+            QPushButton {
+                background-color: #dc3545;
+                color: white;
+                border: none;
+                padding: 8px 20px;
+                border-radius: 5px;
+                font-size: 13px;
+                font-weight: bold;
+                min-height: 14px;
+            }
+            QPushButton:hover {
+                background-color: #c82333;
+            }
+            QPushButton:pressed {
+                background-color: #bd2130;
+            }
+        """)
         submit.clicked.connect(lambda: self._signup_request(fn_input.text(), em_input.text(), ph_input.text(), un_input.text(), pw_input.text()))
-        for w in [fn_label, fn_input, em_label, em_input, ph_label, ph_input, un_label, un_input, pw_label, pw_input, submit]:
-            form.addWidget(w)
-
-        # Assemble 50/50
-        left.setFixedWidth(700)
-        row.addWidget(left)
-        row.addWidget(right)
+        
+        # Add widgets to form
+        form_layout.addWidget(title)
+        for widget in [fn_label, fn_input, em_label, em_input, ph_label, ph_input, un_label, un_input, pw_label, pw_input, submit]:
+            form_layout.addWidget(widget)
+        
+        # Center the form horizontally
+        form_center_layout = QHBoxLayout()
+        form_center_layout.addStretch()
+        form_center_layout.addWidget(form_container)
+        form_center_layout.addStretch()
+        
+        # Add sections with controlled spacing
+        main_layout.addWidget(header_widget)
+        main_layout.addLayout(form_center_layout)
+        main_layout.addStretch()
+        
         self.main_layout.addWidget(container)
 
     def _signup_request(self, full_name: str, email: str, phone: str, username: str, password: str):
+        # Basic client-side validation for friendlier errors
+        full_name = (full_name or "").strip()
+        email = (email or "").strip()
+        phone = (phone or "").strip()
+        username = (username or "").strip()
+        password = (password or "").strip()
+        if not full_name or not email or not username or not password:
+            QMessageBox.warning(self, "Sign Up", "Full name, email, username and password are required.")
+            return
+        if "@" not in email or "." not in email:
+            QMessageBox.warning(self, "Sign Up", "Please enter a valid email address.")
+            return
+        if len(username) < 3:
+            QMessageBox.warning(self, "Sign Up", "Username must be at least 3 characters.")
+            return
+        if len(password) < 8:
+            QMessageBox.warning(self, "Sign Up", "Password must be at least 8 characters.")
+            return
         try:
             r = requests.post(f"{BACKEND_BASE_URL}/api/auth/signup", json={
                 "full_name": full_name,
@@ -1041,11 +1276,32 @@ class MainAppWindow(QMainWindow):
                 QMessageBox.information(self, "Sign Up", "Account created. Please log in.")
                 self.show_login_page()
             else:
-                QMessageBox.critical(self, "Sign Up Error", r.text)
+                try:
+                    data = r.json()
+                except Exception:
+                    data = {"detail": r.text}
+                detail = data.get("detail", "Sign up failed")
+                if r.status_code == 400:
+                    QMessageBox.warning(self, "Sign Up", str(detail))
+                elif r.status_code == 422:
+                    # pydantic validation details
+                    if isinstance(detail, list) and detail:
+                        first = detail[0]
+                        msg = first.get("msg", "Invalid input")
+                        QMessageBox.warning(self, "Sign Up", msg)
+                    else:
+                        QMessageBox.warning(self, "Sign Up", "Invalid input. Please check fields.")
+                else:
+                    QMessageBox.critical(self, "Sign Up Error", str(detail))
         except Exception as e:
             QMessageBox.critical(self, "Sign Up Error", str(e))
 
     def _login_request(self, identifier: str, password: str):
+        identifier = (identifier or "").strip()
+        password = (password or "").strip()
+        if not identifier or not password:
+            QMessageBox.warning(self, "Log In", "Please enter both fields.")
+            return
         try:
             r = requests.post(f"{BACKEND_BASE_URL}/api/auth/login", json={
                 "identifier": identifier,
@@ -1054,10 +1310,21 @@ class MainAppWindow(QMainWindow):
             if r.status_code == 200:
                 data = r.json()
                 self.auth_token = data.get("token")
+                self.is_authenticated = True
                 QMessageBox.information(self, "Log In", f"Welcome {data.get('user',{}).get('username','')}!")
+                # Show sidebar after successful authentication
+                self.side_navigation.show()
                 self.show_home_page()
             else:
-                QMessageBox.critical(self, "Log In Error", r.text)
+                try:
+                    data = r.json()
+                except Exception:
+                    data = {"detail": r.text}
+                detail = data.get("detail", "Login failed")
+                if r.status_code == 401:
+                    QMessageBox.warning(self, "Log In", "Invalid username/email or password.")
+                else:
+                    QMessageBox.critical(self, "Log In Error", str(detail))
         except Exception as e:
             QMessageBox.critical(self, "Log In Error", str(e))
 
