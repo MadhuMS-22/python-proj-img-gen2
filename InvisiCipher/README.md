@@ -15,6 +15,44 @@ Enhanced Super Resolution
 
 Welcome to our Steganography and Super Resolution project! This project combines the power of steganography techniques and super-resolution using deep learning models. Our goal is to hide a secret image within a cover image using advanced convolutional neural networks (CNNs) and then enhance the quality of the hidden image using an Enhanced Super Resolution Generative Adversarial Network (ESRGAN). We also provide an option to encrypt the steg image using various chaos encryption algorithms for added security.
 
+## Run on Windows using ZIP (no Git)
+
+- **Download ZIP**
+  - Visit: `https://github.com/MadhuMS-22/python-proj-img-gen2`
+  - Click "Code" → "Download ZIP"
+  - Extract to a short path (e.g., `C:\InvisiCipher`) to avoid long-path issues
+
+- **Install Python**
+  - Install Python 3.11+ from `https://www.python.org/downloads/windows/`
+  - During installation, check "Add Python to PATH"
+
+- **Open PowerShell in the project folder**
+  - Shift + Right‑click inside the extracted `InvisiCipher` folder → "Open PowerShell window here"
+
+- **One‑time automatic setup** (creates venv, installs deps, sets up DB)
+  ```powershell
+  python setup_invisicipher.py
+  ```
+  - First run may take 10–15 minutes (downloads ML libraries)
+  - Uses CPU build of TensorFlow for compatibility
+
+- **Launch the app**
+  - Option A (command):
+    ```powershell
+    python launch_gen2.py
+    ```
+  - Option B (double‑click): `launch_invisicipher.bat`
+
+- **First use**
+  - Welcome/auth screen → click "Sign Up" (username ≥ 3 chars, password ≥ 8)
+  - After login, sidebar appears and features unlock
+
+- **Troubleshooting**
+  - "python is not recognized": reinstall Python with "Add to PATH"
+  - Missing modules (cv2/TensorFlow/PyQt5): re‑run `python setup_invisicipher.py`
+  - DB permission issues: move folder to a writable location (e.g., `C:\InvisiCipher`)
+  - Qt stylesheet warnings (box‑shadow/overflow): safe to ignore
+
 ## Features
 
 ✨ **Interactive Hiding**: Utilize our intuitive hide network powered by CNNs to embed secret images within cover images effortlessly.
